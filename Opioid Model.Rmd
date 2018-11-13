@@ -3,27 +3,26 @@ title: "R Notebook"
 output: html_notebook
 ---
 
-
-
 ```{r}
 library(deSolve)
+library(ggplot2)
 model = function(pop, world, jail, sition, dead, betaWJ, betaJT, betaTW, betaTD, betaWD, betaWO, betaJO, betaOW) {
+  deadW = 0
+  deadT = 0
   times = seq(0, 365, by = 0.1)
-  out <- ode(y = c(pop, world, jail, sition, dead), times = times, func = plonk, parms = c(betaWJ, betaJT, betaTW, betaTD, betaWD, betaWO, betaJO, betaWO))
-
-  plot(times, out[,2], xlab = "Days", ylab = "Population", type = 'l', ylim = c(0, 10000), col="royalblue")
-  lines(times, out[,3], type = 'l', col="purple")
-  lines(times, out[,4], type = 'l', col="red")
-  lines(times, out[,5], type = 'l', col="pink")
-  lines(times, out[,6], type = 'l', col="orange")
-  legend(30, 10000, legend=c("Population","World", "Jail", "Transition", "Dead"), col=c("royalblue", "purple", "red", "pink", "orange"), lty=1, cex=0.8)
+  
+  out <- ode(y = c(pop, world, jail, sition, dead, deadW, deadT), times = times, func = plonk, parms = c(betaWJ, betaJT, betaTW, betaTD, betaWD, betaWO, betaJO, betaWO))
+  print(out[,8])
+  plot(times, out[,8]/out[,7], xlab = "Days", ylab = "Ratio", type = 'l', ylim = c(0, 150), col="royalblue")
+  legend(30, 10, legend=c("Population","World", "Jail", "Transition", "Dead"), col=c("royalblue", "purple", "red", "pink", "orange"), lty=1, cex=0.8)
   }
-model(10000, 9000, 1000, 0, 0, .01, .01, .01, .01, .01, .01, .01, .01)
+model(5100000, 5000000, 100000, 0, 0, 1/14, .01, .01, .0001*130, .0001, .1, .1, .1)
+
 ```
 
 ```{r}
 worldJail = function(pop, world, beta) {
-  return (world*beta/pop)
+  return (beta*world/pop)
 }
 jailSition = function(pop, jail, beta) {
   return (beta*jail/pop)
@@ -58,33 +57,7 @@ dWorldOut <- worldOut(state[1], state[2], parameters[6])
 dJailOut <- worldOut(state[1], state[3], parameters[7])
 dOutWorld <- worldOut(state[1], state[2], parameters[8])
 # return the rate of change
-list(c(dOutWorld-(dWorldOut+dJailOut), dOutWorld+dSitionWorld-dWorldJail-dWorldDead-dWorldOut, dWorldJail-dJailSition-dJailOut, dJailSition-dSitionWorld-dSitionDead, dWorldDead+dSitionDead))
+list(c(dOutWorld-(dWorldOut+dJailOut), dOutWorld+dSitionWorld-dWorldJail-dWorldDead-dWorldOut, dWorldJail-dJailSition-dJailOut, dJailSition-dSitionWorld-dSitionDead, dWorldDead+dSitionDead,dWorldDead/state[2], dSitionDead/state[4]))
 }) # end with(as.list ...
 }
-```
-
-```{r}
-library(deSolve)
-model1 = function(pop, beta2, gamma, sus1, sus2, inf, rec) {
-  beta1 = .01*beta2
-  beta3 = 2*0.5*((0.1*.798 + .202)*(sus1/(sus1+sus2))+((.7*.798*+1.3*.202)*(sus2/(sus1+sus2))))
-  gammaG = 0.1
-  inf2 = 1000
-  sus3 = pop - inf2
-  times = seq(0, 52, by = 0.1)
-  out <- ode(y = c(pop, sus1, sus2, inf, rec, sus3, inf2), times = times, func = Sick, parms = c(beta1, beta2, gamma, beta3, gammaG))
-  plot(times, out[,3], xlab = "Weeks", ylab = "Population", type = 'l', ylim = c(4480, 4520), col="royalblue", main = "Adherence to Medicine")
-  lines(times, out[,4], type = 'l', col="red")
-  for (i in c(0, 1)){
-    out <- ode(y = c(pop, sus1, sus2, inf, rec, sus3, inf2), times = times, func = Sick, parms = c(beta1*25^(i-1+i*1), beta2, gamma, beta3, gammaG))
-    col1 = c("pink", "purple")
-    col2 = c("orange","green")
-    print(col1[floor(i)+1])
-    lines(times, out[,3], type = 'l', col=col1[floor(i)+1])
-    lines(times, out[,4], type = 'l', col=col2[floor(i)+1])
-  }
-  legend(20, 4520, legend=c("Susceptible PrEP Users Normal Medicine Use", "Susceptible non PrEP Users Normal Medicine Use","Susceptible PrEP Users High Medicine Use","Susceptible non PrEP Users High Medicine Use","Susceptible PrEP Users Low Medicine Use","Susceptible non PrEP Users Low Medicine Use"), col=c("royalblue", "red", "pink", "orange", "purple", "green"), lty=1, cex=0.8)
-
-}
-model1(10000, 2*.00745*(.1*.798+.202), 1/4*.49, 4500, 4500, 1000, 0)
 ```
