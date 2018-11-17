@@ -6,58 +6,87 @@ output: html_notebook
 ```{r}
 library(deSolve)
 library(ggplot2)
+library(reshape2) #melt(), dcast() for data reformatting
 model = function(pop, world, jail, sition, dead, betaWJ, betaJT, betaTW, betaTD, betaWD, betaWO, betaJO, betaOW) {
   deadW = 0
   deadT = 0
   times = seq(0, 365, by = 0.1)
   
-  out <- ode(y = c(pop, world, jail, sition, dead, deadW, deadT), times = times, func = plonk, parms = c(betaWJ, betaJT, betaTW, betaTD, betaWD, betaWO, betaJO, betaWO))
-  print(out[,8])
-  plot(times, out[,8]/out[,7], xlab = "Days", ylab = "Ratio", type = 'l', ylim = c(0, 150), col="royalblue")
-  legend(30, 10, legend=c("Population","World", "Jail", "Transition", "Dead"), col=c("royalblue", "purple", "red", "pink", "orange"), lty=1, cex=0.8)
+  out <- ode(y = c(pop, world, jail, sition, dead, deadW, deadT), times = times, func = plonk, parms = c(betaWJ, betaJT, betaTW, betaTD, betaWD, betaWO, betaJO, betaOW))
+  
+  #plot(times, out[,2], xlab = "Days", ylab = "Ratio", type = 'l', ylim = c(0, 6000000), col="royalblue")
+  #lines(times, out[,3], col = "purple")
+  #lines(times, out[,4], col = "red")
+  #lines(times, out[,5], col = "pink")
+  #lines(times, out[,6], col = "orange")
+  #legend(30, 5000000, legend=c("Population","World", "Jail", "Transition", "Dead"), col=c("royalblue", "purple", "red", "pink", "orange"), lty=1, cex=0.8)
+  return(tail(out[,8]/out[,7], n=1))
   }
-model(5100000, 5000000, 100000, 0, 0, 1/14, .01, .01, .0001*130, .0001, .1, .1, .1)
+mat = matrix(,nrow = 10, ncol = 10)
+cols = vector()
+rows = vector()
+frame = data.frame()
+for (i in 1:10){
+  vec = vector()
+  print(i)
+  rows = c(rows, .0001*i)
+  for (j in 1:10) {
+    print(j)
+    vec = c(vec,model(5100000, 5000000, 100000, 0, 0, 1/14, .01, .01, .0001*(80+j)*i, .0001*i, .001, .001, .01))
+    cols = c(cols, .0001*(80*j)*i)
+  }
+  mat[i,] = vec
+}
+  longData<-melt(mat)
+  frame = data.frame(mat)
+  ggplot(longData, aes(x = round(80+Var1,10), y = round(.0001*Var2,10))) + 
+  geom_raster(aes(fill=value)) + 
+  scale_fill_gradient(low="grey90", high="red") +
+  labs(x="βOW/βWD", y="βWD", title="Heatmap") +
+  theme_bw() + theme(axis.text.x=element_text(size=9, angle=0, vjust=0.3),
+                     axis.text.y=element_text(size=9),
+                     plot.title=element_text(size=11))
 
 ```
 
 ```{r}
-worldJail = function(pop, world, beta) {
-  return (beta*world/pop)
+worldJail = function(pop, world, jail, sition, beta) {
+  return (beta*(world*jail+world*sition)/pop)
 }
 jailSition = function(pop, jail, beta) {
-  return (beta*jail/pop)
+  return (beta*jail)
 }
 sitionWorld = function(pop, sition, beta) {
-  return (beta*sition)/pop
+  return (beta*sition)
 }
 sitionDead = function(pop, sition, beta) {
-  return (beta*sition)/pop
+  return (beta*sition)
 }
 worldDead = function(pop, world, beta) {
-  return (beta*world)/pop
+  return (beta*world)
 }
 worldOut = function(pop, world, beta) {
-  return (beta*world)/pop
+  return (beta*world)
 }
 jailOut = function(pop, jail, beta) {
-  return (beta*jail)/pop
+  return (beta*jail)
 }
 outWorld = function(pop, world, beta) {
-  return (beta*world)/pop
+  return (beta*world)
 }
 plonk <- function(t, state, parameters) {
 with(as.list(c(state, parameters)),{
 # rate of change
-dWorldJail <- worldJail(state[1], state[2], parameters[1])
+dWorldJail <- worldJail(state[1], state[2], state[3], state[4], parameters[1])
 dJailSition <- jailSition(state[1], state[3], parameters[2])
-dSitionWorld <- jailSition(state[1], state[4], parameters[3])
+dSitionWorld <- sitionWorld(state[1], state[4], parameters[3])
 dSitionDead <- sitionDead(state[1], state[4], parameters[4])
 dWorldDead <- worldDead(state[1], state[2], parameters[5])
 dWorldOut <- worldOut(state[1], state[2], parameters[6])
 dJailOut <- worldOut(state[1], state[3], parameters[7])
 dOutWorld <- worldOut(state[1], state[2], parameters[8])
 # return the rate of change
-list(c(dOutWorld-(dWorldOut+dJailOut), dOutWorld+dSitionWorld-dWorldJail-dWorldDead-dWorldOut, dWorldJail-dJailSition-dJailOut, dJailSition-dSitionWorld-dSitionDead, dWorldDead+dSitionDead,dWorldDead/state[2], dSitionDead/state[4]))
+list(c(dOutWorld-(dWorldOut+dJailOut), (dOutWorld+dSitionWorld-dWorldJail-dWorldDead-dWorldOut-parameters[3]*(dWorldJail-dJailSition-dJailOut))/(1-parameters[5]), dWorldJail-dJailSition-dJailOut, dJailSition-dSitionWorld-dSitionDead+parameters[3]*(dWorldJail-dJailSition-dJailOut), dWorldDead+dSitionDead-parameters[5]*(dWorldJail-dJailSition-dJailOut),dWorldDead/state[2], dSitionDead/(state[4]+1)))
 }) # end with(as.list ...
 }
 ```
