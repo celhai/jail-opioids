@@ -7,42 +7,44 @@ output: html_notebook
 library(deSolve)
 library(ggplot2)
 library(reshape2) #melt(), dcast() for data reformatting
-model = function(pop, world, jail, sition, dead, betaWJ, betaJT, betaTW, betaTD, betaWD, betaWO, betaJO, betaOW) {
+model = function(pop, world, jail, sition, dead, betaWJ, betaJT, betaTW, betaWD, betaWO, betaJO, betaOW) {
+  betaTD = 130*betaWD*(1-betaJT)
   deadW = 0
   deadT = 0
   times = seq(0, 365, by = 0.1)
   
   out <- ode(y = c(pop, world, jail, sition, dead, deadW, deadT), times = times, func = plonk, parms = c(betaWJ, betaJT, betaTW, betaTD, betaWD, betaWO, betaJO, betaOW))
   
-  #plot(times, out[,2], xlab = "Days", ylab = "Ratio", type = 'l', ylim = c(0, 6000000), col="royalblue")
-  #lines(times, out[,3], col = "purple")
-  #lines(times, out[,4], col = "red")
-  #lines(times, out[,5], col = "pink")
-  #lines(times, out[,6], col = "orange")
-  #legend(30, 5000000, legend=c("Population","World", "Jail", "Transition", "Dead"), col=c("royalblue", "purple", "red", "pink", "orange"), lty=1, cex=0.8)
-  return(tail(out[,8]/out[,7], n=1))
+  plot(times, out[,2], xlab = "Days", ylab = "Ratio", type = 'l', ylim = c(0, 6000000), col="royalblue")
+  lines(times, out[,3], col = "purple")
+  lines(times, out[,4], col = "red")
+  lines(times, out[,5], col = "pink")
+  lines(times, out[,6], col = "orange")
+  legend(30, 5000000, legend=c("Population","World", "Jail", "Transition", "Dead"), col=c("royalblue", "purple", "red", "pink", "orange"), lty=1, cex=0.8)
+  #return(tail(out[,8]/out[,7], n=1))
+  return(tail(out[,5], 1))
   }
 mat = matrix(,nrow = 10, ncol = 10)
 cols = vector()
 rows = vector()
 frame = data.frame()
-for (i in 1:10){
+for (i in 2*(1:10)){
   vec = vector()
   print(i)
   rows = c(rows, .0001*i)
   for (j in 1:10) {
     print(j)
-    vec = c(vec,model(5100000, 5000000, 100000, 0, 0, 1/14, .01, .01, .0001*(80+j)*i, .0001*i, .001, .001, .01))
+    vec = c(vec,model(5100000, 5000000, 100000, 0, 0, .1, 1/(i), .01, .0001*j, .001, .001, .01))
     cols = c(cols, .0001*(80*j)*i)
   }
-  mat[i,] = vec
+  mat[i/2,] = vec
 }
   longData<-melt(mat)
   frame = data.frame(mat)
-  ggplot(longData, aes(x = round(80+Var1,10), y = round(.0001*Var2,10))) + 
+  ggplot(longData, aes(x = round(Var2,10), y = round(.0001*Var1,10))) + 
   geom_raster(aes(fill=value)) + 
   scale_fill_gradient(low="grey90", high="red") +
-  labs(x="βOW/βWD", y="βWD", title="Heatmap") +
+  labs(x="1/βJT", y="βWD", title="Heatmap") +
   theme_bw() + theme(axis.text.x=element_text(size=9, angle=0, vjust=0.3),
                      axis.text.y=element_text(size=9),
                      plot.title=element_text(size=11))
