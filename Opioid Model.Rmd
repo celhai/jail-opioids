@@ -7,88 +7,64 @@ output: html_notebook
 library(deSolve)
 library(ggplot2)
 library(reshape2) #melt(), dcast() for data reformatting
-model = function(pop, world, jail, sition, dead, betaWJ, betaJT, betaTW, betaWD, betaWO, betaJO, betaOW) {
-  betaTD = 130*betaWD*(1-betaJT)
+library(lhs)
+model = function(pop, world, jail, sition, dead, out, betaWJ, betaJT, betaTW, betaTD, betaWD, betaWO, betaJO, betaOW) {
   deadW = 0
   deadT = 0
-  times = seq(0, 365, by = 0.1)
+  times = seq(0, 700, by = 0.1)
   
-  out <- ode(y = c(pop, world, jail, sition, dead, deadW, deadT), times = times, func = plonk, parms = c(betaWJ, betaJT, betaTW, betaTD, betaWD, betaWO, betaJO, betaOW))
+  out <- ode(y = c(pop, world, jail, sition, dead, out, deadW, deadT), times = times, func = plonk, parms = c(betaWJ, betaJT, betaTW, betaTD, betaWD, betaWO, betaJO, betaOW))
   
-  plot(times, out[,2], xlab = "Days", ylab = "Ratio", type = 'l', ylim = c(0, 6000000), col="royalblue")
+  plot(times, out[,2], xlab = "Days", ylab = "Ratio", type = 'l', ylim = c(0, 203000000), col="royalblue")
   lines(times, out[,3], col = "purple")
   lines(times, out[,4], col = "red")
   lines(times, out[,5], col = "pink")
   lines(times, out[,6], col = "orange")
-  legend(30, 5000000, legend=c("Population","World", "Jail", "Transition", "Dead"), col=c("royalblue", "purple", "red", "pink", "orange"), lty=1, cex=0.8)
+  lines(times, out[,7], col = "green")
+  legend(300, 150000000, legend=c("Population","World", "Jail", "Transition", "Dead", "Outside"), col=c("royalblue", "purple", "red", "pink", "orange", "green"), lty=1, cex=0.8)
   #return(tail(out[,8]/out[,7], n=1))
   return(tail(out[,5], 1))
   }
-mat = matrix(,nrow = 10, ncol = 10)
-cols = vector()
-rows = vector()
-frame = data.frame()
-for (i in 2*(1:10)){
-  vec = vector()
-  print(i)
-  rows = c(rows, .0001*i)
-  for (j in 1:10) {
-    print(j)
-    vec = c(vec,model(5100000, 5000000, 100000, 0, 0, .1, 1/(i), .01, .0001*j, .001, .001, .01))
-    cols = c(cols, .0001*(80*j)*i)
-  }
-  mat[i/2,] = vec
+set.seed(2)
+lhsMat = randomLHS(5,5)
+print(lhsMat)
+#betaWJ, betaTD, betaWD, betaWO, betaOW
+#no JT, TW, or JO
+for (i in (1:nrow(lhsMat))){
+    vec = c(vec,model(202500000, 2500000, 0, 0, 0, 200000000, lhsMat[i,1], 1/14, 1/14, lhsMat[i,2], lhsMat[i,3], lhsMat[i,4], 0, lhsMat[i,5]))
 }
-  longData<-melt(mat)
-  frame = data.frame(mat)
-  ggplot(longData, aes(x = round(Var2,10), y = round(.0001*Var1,10))) + 
-  geom_raster(aes(fill=value)) + 
-  scale_fill_gradient(low="grey90", high="red") +
-  labs(x="1/βJT", y="βWD", title="Heatmap") +
-  theme_bw() + theme(axis.text.x=element_text(size=9, angle=0, vjust=0.3),
-                     axis.text.y=element_text(size=9),
-                     plot.title=element_text(size=11))
+#  longData<-melt(mat)
+#  frame = data.frame(mat)
+#  ggplot(longData, aes(x = round(Var2,10), y = round(.0001*Var1,10))) + 
+#  geom_raster(aes(fill=value)) + 
+#  scale_fill_gradient(low="grey90", high="red") +
+#  labs(x="1/βJT", y="βWD", title="Heatmap") +
+#  theme_bw() + theme(axis.text.x=element_text(size=9, angle=0, vjust=0.3),
+#                     axis.text.y=element_text(size=9),
+#                     plot.title=element_text(size=11))
 
 ```
 
 ```{r}
-worldJail = function(pop, world, jail, sition, beta) {
-  return (beta*(world*jail+world*sition)/pop)
-}
-jailSition = function(pop, jail, beta) {
-  return (beta*jail)
-}
-sitionWorld = function(pop, sition, beta) {
-  return (beta*sition)
-}
-sitionDead = function(pop, sition, beta) {
-  return (beta*sition)
-}
-worldDead = function(pop, world, beta) {
-  return (beta*world)
-}
-worldOut = function(pop, world, beta) {
-  return (beta*world)
-}
-jailOut = function(pop, jail, beta) {
-  return (beta*jail)
-}
-outWorld = function(pop, world, beta) {
-  return (beta*world)
-}
 plonk <- function(t, state, parameters) {
 with(as.list(c(state, parameters)),{
 # rate of change
-dWorldJail <- worldJail(state[1], state[2], state[3], state[4], parameters[1])
-dJailSition <- jailSition(state[1], state[3], parameters[2])
-dSitionWorld <- sitionWorld(state[1], state[4], parameters[3])
-dSitionDead <- sitionDead(state[1], state[4], parameters[4])
-dWorldDead <- worldDead(state[1], state[2], parameters[5])
-dWorldOut <- worldOut(state[1], state[2], parameters[6])
-dJailOut <- worldOut(state[1], state[3], parameters[7])
-dOutWorld <- worldOut(state[1], state[2], parameters[8])
+#state  - pop, world, jail, sition, dead, out, deadW, deadT
+#parameters betaWJ, betaJT, betaTW, betaTD, betaWD, betaWO, betaJO, betaOW
+dJail = -parameters[7]*state[3]+parameters[1]*state[2] - parameters[2]*state[3]
+dWorld = ((parameters[8]*state[2]*state[6])/(state[2]+state[3]+state[4]+state[6])-(parameters[6]*state[2]*state[6])/(state[2]+state[3]+state[4]+state[6])+parameters[3]*state[4]-parameters[3]*dJail-parameters[1]*state[2]-parameters[5]*state[2])/(1+parameters[5])
+dSition = -parameters[3]*state[4]+parameters[3]*dJail-parameters[4]*state[4]+parameters[2]*state[3]
+dDead = parameters[5]*state[2]+parameters[5]*dWorld+parameters[4]*state[4]
+dOut = (parameters[6]*state[2]*state[6])/(state[2]+state[3]+state[4]+state[6])-(parameters[8]*state[2]*state[6])/(state[2]+state[3]+state[4]+state[6])
 # return the rate of change
-list(c(dOutWorld-(dWorldOut+dJailOut), (dOutWorld+dSitionWorld-dWorldJail-dWorldDead-dWorldOut-parameters[3]*(dWorldJail-dJailSition-dJailOut))/(1-parameters[5]), dWorldJail-dJailSition-dJailOut, dJailSition-dSitionWorld-dSitionDead+parameters[3]*(dWorldJail-dJailSition-dJailOut), dWorldDead+dSitionDead-parameters[5]*(dWorldJail-dJailSition-dJailOut),dWorldDead/state[2], dSitionDead/(state[4]+1)))
+list(c(0,
+  dWorld,
+  dJail,
+  dSition,
+  dDead,
+  dOut,
+  parameters[5]*state[2]+parameters[5]*dWorld,
+  parameters[4]*state[4]))
 }) # end with(as.list ...
 }
 ```
